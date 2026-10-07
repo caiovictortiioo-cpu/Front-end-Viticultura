@@ -3,8 +3,8 @@ import { icon } from './icons.js';
 
 /** Componentes visuais pequenos e reutilizáveis (equivalentes aos componentes do projeto original). */
 
-export const button = (children, { variant = 'primary', iconName, type = 'button' } = {}) =>
-  html`<button type="${type}" class="btn btn-${variant}">${iconName && icon(iconName, 17)}<span>${children}</span></button>`;
+export const button = (children, { variant = 'primary', iconName, type = 'button', action, page, disabled = false, title } = {}) =>
+  html`<button type="${type}" class="btn btn-${variant}"${action ? html` data-action="${action}"` : ''}${page ? html` data-page="${page}"` : ''}${disabled ? ' disabled' : ''}${title ? html` title="${title}"` : ''}>${iconName && icon(iconName, 17)}<span>${children}</span></button>`;
 
 /**
  * Campo <select>. Sem `action`, o valor fica travado (comportamento do original,
@@ -18,8 +18,10 @@ export function selectField({ value, options, label, action }) {
   return html`<label class="field compact">${label && html`<span>${label}</span>`}<select ${behavior}>${optionsMarkup}</select></label>`;
 }
 
-export const logo = ({ light = false } = {}) =>
-  html`<div class="logo ${light ? 'logo-light' : ''}"><div class="logo-mark">${icon('leaf', 21)}</div><div><strong>AgroClima</strong><span>Cloud</span></div></div>`;
+export const logo = ({ light = false, name = 'AgroClima Cloud' } = {}) => {
+  const [first, ...rest] = String(name || 'AgroClima Cloud').trim().split(/\s+/);
+  return html`<div class="logo ${light ? 'logo-light' : ''}"><div class="logo-mark">${icon('leaf', 21)}</div><div><strong>${first || 'AgroClima'}</strong>${rest.length ? html`<span>${rest.join(' ')}</span>` : ''}</div></div>`;
+};
 
 export const badge = (children, tone = 'success') =>
   html`<span class="badge badge-${tone}"><span class="status-dot"></span>${children}</span>`;

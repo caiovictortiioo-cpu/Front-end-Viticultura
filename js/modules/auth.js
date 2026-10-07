@@ -1,9 +1,12 @@
 import { ROLES } from '../config/roles.js';
+import { findRbacUserByEmail } from './access-control.js';
 
-/** Regra de negócio da demonstração: o perfil é deduzido pelo e-mail informado. */
+/**
+ * Autenticação apenas demonstrativa: o perfil vem da associação RBAC do e-mail.
+ * E-mails não cadastrados ficam no perfil Produtor. Não há senha validada nem
+ * servidor de identidade neste projeto.
+ */
 export function resolveRole(email) {
-  const normalizedEmail = email.toLowerCase();
-  if (normalizedEmail.includes('admin')) return ROLES.ADMIN;
-  if (normalizedEmail.includes('analista')) return ROLES.ANALYST;
-  return ROLES.PRODUCER;
+  const assignedUser = findRbacUserByEmail(String(email ?? '').trim().toLowerCase());
+  return assignedUser?.role ?? ROLES.PRODUCER;
 }

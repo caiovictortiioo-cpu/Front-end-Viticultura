@@ -13,10 +13,10 @@ export function comparisonTable() {
   });
   return card(
     html`${sectionHead({
-      title: 'Comparativo de Variedades',
-      subtitle: 'Cenário consolidado para tomada de decisão',
-      action: button('Comparar em detalhes', { variant: 'ghost', iconName: 'compare' }),
-    })}${tableWrapper(['Variedade', 'Temperatura', 'Umidade', 'Risco', 'Previsão', 'Score', 'Status'], rows)}`,
+      title: 'Comparativo de variedades',
+      subtitle: 'Confira como as condições podem afetar cada tipo de uva.',
+      action: button('Ver comparação', { variant: 'ghost', iconName: 'compare', action: 'navigate', page: 'Comparação' }),
+    })}${tableWrapper(['Variedade', 'Temperatura', 'Umidade', 'Risco do clima', 'Condição', 'Adequação', 'Sugestão'], rows)}`,
     'table-card',
   );
 }
@@ -29,13 +29,14 @@ const RECENT_READINGS = [
 ];
 
 export function readingsTable() {
+  const today = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
   const rows = RECENT_READINGS.map(
-    ([time, temperature, humidity]) => html`<tr><td>16/09/2026 · ${time}</td><td>${temperature}</td><td>${humidity}</td><td>THS-ESP32-04</td><td>Uva Itália</td><td>${badge('Validado')}</td></tr>`,
+    ([time, temperature, humidity]) => html`<tr><td>${today} · ${time}</td><td>${temperature}</td><td>${humidity}</td><td>THS-ESP32-04</td><td>Uva Itália</td><td>${badge('Demonstrativo', 'info')}</td></tr>`,
   );
   return card(
     html`${sectionHead({
       title: 'Leituras recentes',
-      subtitle: 'Registros validados pela camada de processamento',
+      subtitle: 'Amostras demonstrativas; não são medidas ao vivo.',
       action: button('Exportar CSV', { variant: 'ghost', iconName: 'download' }),
     })}${tableWrapper(['Data / hora', 'Temperatura', 'Umidade', 'Sensor', 'Variedade', 'Status'], rows)}`,
     'table-card',

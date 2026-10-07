@@ -1,19 +1,43 @@
 /**
- * Estado global mínimo da aplicação, com notificação de mudanças.
- * `setState` informa aos assinantes quais chaves mudaram.
+ * Estado global da interface, com notificação das chaves alteradas.
+ * Os registros persistentes ficam no repositório local da demonstração.
  */
 import { DEFAULT_VARIETY } from '../data/varieties.js';
 import { ROLES } from '../config/roles.js';
+import { getAuditEvents } from '../modules/audit.js';
+import { getRbacSnapshot } from '../modules/access-control.js';
+import { getPlantations } from '../modules/plantations.js';
+import { getSettings } from '../modules/settings.js';
 
-const initialState = () => ({
-  authenticated: false,
-  authMode: 'login', // 'login' | 'signup' | 'forgot'
-  email: '',
-  role: ROLES.PRODUCER,
-  page: null,
-  variety: DEFAULT_VARIETY,
-  menuOpen: false,
-});
+const initialState = () => {
+  const settings = getSettings();
+  return {
+    authenticated: false,
+    authMode: 'login', // 'login' | 'signup' | 'forgot'
+    authMessage: '',
+    email: '',
+    role: ROLES.PRODUCER,
+    page: null,
+    variety: settings.general.defaultVariety || DEFAULT_VARIETY,
+    menuOpen: false,
+    theme: settings.appearance.theme,
+    settings,
+    settingsSection: 'Geral',
+    plantations: getPlantations(),
+    rbac: getRbacSnapshot(),
+    auditLogs: getAuditEvents(),
+    logSearch: '',
+    logStatus: 'Todos',
+    logResource: 'Todos',
+    logSort: 'newest',
+    expandedLogId: null,
+    designMessage: '',
+    modelMessage: '',
+    producerMessage: '',
+    settingsMessage: '',
+    rbacMessage: '',
+  };
+};
 
 let state = initialState();
 const listeners = new Set();
@@ -32,5 +56,5 @@ export const subscribe = (listener) => {
   return () => listeners.delete(listener);
 };
 
-/** Volta ao estado inicial (usado no logout, como no desmonte dos componentes originais). */
+/** Reinicia apenas a sessão de interface; preferências e registros persistidos continuam. */
 export const resetState = () => setState({ ...initialState() });

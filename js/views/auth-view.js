@@ -11,11 +11,11 @@ const backToLogin = html`<button type="button" class="back-link" data-action="au
 const textField = ({ label, placeholder, type = 'text' }) =>
   html`<label class="field"><span>${label}</span><input${type === 'text' ? '' : html` type="${type}"`} required placeholder="${placeholder}"></label>`;
 
-function loginForm(email) {
+function loginForm(email, authMessage = '') {
   const demoButtons = DEMO_ACCESSES.map(
     (access) => html`<button type="button" data-action="demo-login" data-email="${access.email}"><strong>${access.label}</strong><small>${access.email}</small></button>`,
   );
-  return html`<div class="auth-heading"><span class="overline">Acesso à plataforma</span><h1>Bem-vindo ao AgroClima Cloud</h1><p>Monitoramento inteligente para produção e exportação de uvas.</p></div><form data-form="login"><label class="field"><span>E-mail</span><input id="login-email" type="email" value="${email}" placeholder="nome@empresa.com" required></label><label class="field"><span>Senha</span><div class="input-icon"><input type="password" placeholder="Digite sua senha" required>${icon('eye')}</div></label><div class="form-meta"><label><input type="checkbox" checked>Lembrar de mim</label><button type="button" data-action="auth-mode" data-mode="forgot">Esqueci minha senha</button></div>${button('Entrar na plataforma', { type: 'submit' })}</form><div class="demo-access"><span>Acessos independentes para demonstração</span>${demoButtons}</div><div class="signup-link">Ainda não tem uma conta? <button type="button" data-action="auth-mode" data-mode="signup">Criar uma conta</button></div>`;
+  return html`<div class="auth-heading"><span class="overline">Acesso à plataforma</span><h1>Bem-vindo ao AgroClima Cloud</h1><p>Monitoramento inteligente para produção e exportação de uvas.</p></div>${authMessage && html`<p class="form-feedback auth-feedback" role="alert">${authMessage}</p>`}<form data-form="login"><label class="field"><span>E-mail</span><input id="login-email" type="email" value="${email}" placeholder="nome@empresa.com" required></label><label class="field"><span>Senha</span><div class="input-icon"><input type="password" placeholder="Digite sua senha" required>${icon('eye')}</div></label><div class="form-meta"><label><input type="checkbox" checked>Lembrar de mim</label><button type="button" data-action="auth-mode" data-mode="forgot">Esqueci minha senha</button></div>${button('Entrar na plataforma', { type: 'submit' })}</form><div class="demo-access"><span>Acessos independentes para demonstração</span>${demoButtons}</div><div class="signup-link">Ainda não tem uma conta? <button type="button" data-action="auth-mode" data-mode="signup">Criar uma conta</button></div>`;
 }
 
 function signupForm() {
@@ -28,10 +28,10 @@ function forgotForm() {
 }
 
 /** Conteúdo interno do cartão de autenticação, conforme o modo atual. */
-export function authFormContent({ authMode, email }) {
+export function authFormContent({ authMode, email, authMessage }) {
   if (authMode === 'signup') return signupForm();
   if (authMode === 'forgot') return forgotForm();
-  return loginForm(email);
+  return loginForm(email, authMessage);
 }
 
 function visualPanel() {

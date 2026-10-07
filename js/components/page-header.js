@@ -7,7 +7,7 @@ const PERIOD_OPTIONS = ['Últimas 24 horas', 'Últimos 7 dias', 'Últimos 30 dia
 function varietySelector(varietyName, { locked }) {
   const current = findVariety(varietyName);
   return html`<div class="variety-selector"><div class="grape-dot grape-${current.color}"></div>${selectField({
-    label: 'Variedade analisada',
+    label: 'Tipo de uva',
     value: varietyName,
     options: VARIETIES.map((variety) => variety.name),
     action: locked ? undefined : 'change-variety',

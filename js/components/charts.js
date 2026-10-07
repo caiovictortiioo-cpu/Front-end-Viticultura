@@ -38,8 +38,20 @@ export const barChart = (values = DEFAULT_BARS, labels = WEEKDAYS) =>
 export const chartLegend = (items) =>
   html`<div class="chart-legend">${items.map(({ tone, label }) => html`<span><i class="legend-${tone}"></i>${label}</span>`)}</div>`;
 
-export function donutChart({ modifier = '', total, caption, legend }) {
-  return html`<div class="donut-wrap"><div class="donut ${modifier}"><div><strong>${total}</strong><span>${caption}</span></div></div><div class="donut-labels">${legend.map(
+export function donutChart({ modifier = '', total, caption, legend, segments }) {
+  let gradient = '';
+  if (segments?.length) {
+    const sum = segments.reduce((amount, segment) => amount + Number(segment.value || 0), 0);
+    let start = 0;
+    gradient = segments.map((segment, index) => {
+      const end = index === segments.length - 1 ? 100 : start + (sum ? Number(segment.value || 0) / sum : 100 / segments.length);
+      const color = { green: 'var(--green)', blue: 'var(--blue)', gold: 'var(--gold)', red: 'var(--red)' }[segment.tone] || 'var(--muted)';
+      const stop = `${color} ${start}% ${end}%`;
+      start = end;
+      return stop;
+    }).join(', ');
+  }
+  return html`<div class="donut-wrap"><div class="donut ${modifier}"${gradient ? html` style="background:conic-gradient(${gradient})"` : ''}><div><strong>${total}</strong><span>${caption}</span></div></div><div class="donut-labels">${legend.map(
     ({ tone, label, value }) => html`<span><i class="${tone}"></i>${label} <strong>${value}</strong></span>`,
   )}</div></div>`;
 }
