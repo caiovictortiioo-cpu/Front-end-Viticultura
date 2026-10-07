@@ -9,6 +9,7 @@ export const ROLES = Object.freeze({
 export const NAVIGATION = {
   [ROLES.PRODUCER]: [
     { label: 'Visão Geral', icon: 'grid' },
+    { label: 'Minhas Plantações', icon: 'leaf' },
     { label: 'Monitoramento', icon: 'cloud' },
     { label: 'Previsões', icon: 'trend' },
     { label: 'Mercado e Exportação', icon: 'market' },

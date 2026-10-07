@@ -5,39 +5,52 @@ import { badge, button, card, sectionHead } from './ui.js';
 const tableWrapper = (head, body) =>
   html`<div class="table-scroll"><table><thead><tr>${head.map((column) => html`<th>${column}</th>`)}</tr></thead><tbody>${body}</tbody></table></div>`;
 
-export function comparisonTable() {
-  const rows = VARIETIES.map((variety) => {
-    const isLowRisk = variety.risk === 'Baixo';
-    const tone = isLowRisk ? 'success' : 'warning';
-    return html`<tr><td><div class="variety-cell"><span class="grape-dot grape-${variety.color}"></span><div><strong>${variety.name}</strong><small>${variety.type}</small></div></div></td><td>${variety.temp}</td><td>${variety.humid}</td><td>${badge(variety.risk, tone)}</td><td>${isLowRisk ? 'Favorável' : 'Atenção'}</td><td><strong>${variety.score}/100</strong></td><td>${badge(isLowRisk ? 'Ideal' : 'Monitorar', tone)}</td></tr>`;
+export function comparisonTable({ plantations = [], varieties = VARIETIES, comparison = null } = {}) {
+  const varietyNames = [...new Set([
+    ...varieties.map((variety) => typeof variety === 'string' ? variety : variety.name),
+    ...(comparison?.plantationsByVariety || []).map((item) => item.variety),
+    ...plantations.map((item) => item.variety),
+  ])].filter(Boolean);
+  const rows = varietyNames.map((name) => {
+    const serverSummary = comparison?.plantationsByVariety?.find((item) => item.variety === name);
+    const entries = plantations.filter((plantation) => plantation.variety === name);
+    const plants = serverSummary?.plants ?? entries.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const areas = serverSummary?.plantations ?? entries.length;
+    const harvested = serverSummary?.harvested ?? entries.filter((entry) => entry.status === 'Colhida').length;
+    return html`<tr><td><strong>${name}</strong></td><td>${areas}</td><td>${plants.toLocaleString('pt-BR')}</td><td>${harvested}</td></tr>`;
   });
+  const metrics = comparison?.climateMetrics || {};
+  const climateText = Object.entries(metrics).map(([name, item]) => `${name}: ${item.current ?? '—'} ${item.unit || ''}`).join(' · ');
   return card(
     html`${sectionHead({
-      title: 'Comparativo de Variedades',
-      subtitle: 'Cenário consolidado para tomada de decisão',
-      action: button('Comparar em detalhes', { variant: 'ghost', iconName: 'compare' }),
-    })}${tableWrapper(['Variedade', 'Temperatura', 'Umidade', 'Risco', 'Previsão', 'Score', 'Status'], rows)}`,
+      title: 'Comparativo de plantações',
+      subtitle: 'Os dados climáticos são agregados por canal; a API não associa sensores a uma variedade.',
+      action: button('Ver comparação', { variant: 'ghost', iconName: 'compare', action: 'navigate', page: 'Comparação' }),
+    })}${climateText && html`<p class="comparison-climate">Leituras atuais: ${climateText}</p>`}${rows.length
+      ? tableWrapper(['Variedade', 'Áreas cadastradas', 'Plantas registradas', 'Áreas colhidas'], rows)
+      : html`<div class="empty-state compact"><small>Nenhuma plantação está cadastrada no servidor.</small></div>`}`,
     'table-card',
   );
 }
 
-const RECENT_READINGS = [
-  ['09:42:15', '28,4 °C', '67%'],
-  ['09:27:15', '28,1 °C', '68%'],
-  ['09:12:15', '27,8 °C', '69%'],
-  ['08:57:15', '27,3 °C', '70%'],
-];
+function formatDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Data indisponível' : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }).format(date);
+}
 
-export function readingsTable() {
-  const rows = RECENT_READINGS.map(
-    ([time, temperature, humidity]) => html`<tr><td>16/09/2026 · ${time}</td><td>${temperature}</td><td>${humidity}</td><td>THS-ESP32-04</td><td>Uva Itália</td><td>${badge('Validado')}</td></tr>`,
-  );
+export function readingsTable(climate = null) {
+  const points = Array.isArray(climate?.series) ? climate.series.slice().reverse() : [];
+  const keys = [...new Set(points.flatMap((point) => Object.keys(point.values || {})))];
+  const headers = ['Data / hora', ...keys, 'Canal', 'Qualidade'];
+  const rows = points.length
+    ? points.slice(0, 12).map((point) => html`<tr><td>${formatDate(point.timestamp)}</td>${keys.map((key) => html`<td>${point.values?.[key] ?? '—'}</td>`)}<td>${climate?.channelId || 'ThingSpeak'}</td><td>${badge('Disponível', 'success')}</td></tr>`)
+    : [html`<tr><td colspan="${headers.length}"><div class="empty-state compact"><small>Nenhuma leitura climática foi retornada pela API no período.</small></div></td></tr>`];
   return card(
     html`${sectionHead({
       title: 'Leituras recentes',
-      subtitle: 'Registros validados pela camada de processamento',
-      action: button('Exportar CSV', { variant: 'ghost', iconName: 'download' }),
-    })}${tableWrapper(['Data / hora', 'Temperatura', 'Umidade', 'Sensor', 'Variedade', 'Status'], rows)}`,
+      subtitle: climate?.available ? `${climate.records} registros retornados pela API${climate.latestAt ? ` · atualização ${formatDate(climate.latestAt)}` : ''}.` : 'Aguardando uma fonte ThingSpeak configurada e leituras persistidas.',
+      action: points.length ? button('Exportar CSV', { variant: 'ghost', iconName: 'download', action: 'download-climate-report' }) : null,
+    })}${tableWrapper(headers, rows)}`,
     'table-card',
   );
 }

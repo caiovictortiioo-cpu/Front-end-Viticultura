@@ -1,133 +1,159 @@
 import { html } from '../../utils/html.js';
-import { findVariety } from '../../data/varieties.js';
-import { HUMIDITY_SERIES, TEMPERATURE_SERIES } from '../../data/series.js';
+import { VARIETIES } from '../../data/varieties.js';
 import { icon } from '../../components/icons.js';
 import { badge, button, card, chartCard, metricsGrid, sectionHead } from '../../components/ui.js';
-import { barChart, chartLegend, lineChart } from '../../components/charts.js';
+import { lineChart } from '../../components/charts.js';
 import { pageHeader } from '../../components/page-header.js';
-import { comparisonTable, readingsTable } from '../../components/tables.js';
+import { comparisonTable, readingsTable, tableWrapper } from '../../components/tables.js';
 import { page } from './page-layout.js';
 
-function syncStrip() {
-  return html`<div class="sync-strip"><div>${icon('wifi', 17)}<strong>ThingSpeak conectado</strong><span>Dados via API REST · sincronizado há 15s</span></div>${badge('Todos os serviços operacionais')}</div>`;
+function formatNumber(value, maximumFractionDigits = 1) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'Sem leitura';
+  return Number(value).toLocaleString('pt-BR', { maximumFractionDigits });
 }
 
-function harvestRecommendation(varietyName) {
-  return card(
-    html`<div class="recommend-icon">${icon('leaf')}</div><div class="recommend-main"><span class="overline">Recomendação de colheita</span><h3>Janela favorável identificada</h3><div class="recommend-date">18 a 20 de setembro</div><p>Condições climáticas atuais, histórico da variedade e tendência prevista indicam o melhor ponto para colher ${varietyName}.</p><div class="confidence"><span>Confiança da previsão</span><strong>87%</strong><div><i style="width:87%"></i></div></div></div>${button('Ver análise', { variant: 'soft' })}`,
-    'recommend harvest',
-  );
+function formatMetric(metric, property = 'current') {
+  if (!metric || metric[property] === null || metric[property] === undefined) return 'Sem leitura';
+  return `${formatNumber(metric[property])}${metric.unit ? ` ${metric.unit}` : ''}`;
 }
 
-function logisticsRecommendation() {
-  return card(
-    html`<div class="recommend-icon">${icon('truck')}</div><div class="recommend-main"><span class="overline">Recomendação logística</span><h3>Exportação recomendada</h3><div class="recommend-date">19 a 21 de setembro</div><p>Demanda alta e baixo risco climático no trajeto. Preço estimado 8,4% acima da média.</p><div class="recommend-tags">${badge('Risco baixo')}${badge('Demanda alta', 'info')}</div></div>${button('Ver mercado', { variant: 'soft' })}`,
-    'recommend logistics',
-  );
+function normalizeMetricName(value) {
+  return String(value).toLowerCase().replaceAll('_', '');
 }
 
-export function overviewPage({ variety }) {
-  const current = findVariety(variety);
-  return page(
-    pageHeader({ title: 'Visão Geral', subtitle: 'Monitoramento da produção e exportação de uvas', variety }),
-    syncStrip(),
-    metricsGrid([
-      { icon: 'thermo', label: 'Temperatura atual', value: current.temp, meta: 'Na faixa ideal', tone: 'orange' },
-      { icon: 'drop', label: 'Umidade atual', value: current.humid, meta: 'Estável nas últimas 2h', tone: 'blue' },
-      { icon: 'leaf', label: 'Condição atual', value: 'Favorável', meta: 'Índice agronômico 91/100' },
-      { icon: 'truck', label: 'Janela de exportação', value: '18–21 Set', meta: 'Demanda internacional alta', tone: 'purple' },
-      { icon: 'warning', label: 'Risco climático', value: current.risk, meta: 'Sem alertas críticos', tone: 'green' },
-    ]),
-    html`<div class="grid-2">${chartCard({ title: 'Temperatura nas últimas 24 horas', subtitle: 'Leituras processadas a cada 15 minutos', legend: '28,4 °C agora', content: lineChart() })}${chartCard({ title: 'Umidade relativa', subtitle: 'Faixa recomendada: 60%–72%', legend: '67% agora', content: lineChart({ data: HUMIDITY_SERIES, color: 'blue' }) })}</div>`,
-    html`<div class="recommend-grid">${harvestRecommendation(variety)}${logisticsRecommendation()}</div>`,
-    comparisonTable(),
-  );
+const METRIC_ALIASES = {
+  temperature: ['temperature', 'temperaturec', 'tempc', 'temp'],
+  humidity: ['humidity', 'relativehumidity', 'airhumidity'],
+  rainfall: ['rainfall', 'rain', 'precipitation'],
+  soilhumidity: ['soilhumidity', 'soilmoisture'],
+  luminosity: ['luminosity', 'light'],
+};
+
+function metricEntry(climate, requested) {
+  const metrics = climate?.metrics || {};
+  const aliases = METRIC_ALIASES[normalizeMetricName(requested)] || [normalizeMetricName(requested)];
+  return Object.entries(metrics).find(([name]) => aliases.includes(normalizeMetricName(name))) || null;
 }
 
-function integrationStatus() {
-  return html`<div class="integration-status"><div class="thing-logo">${icon('cloud')}</div><div><span>Fonte de dados</span><strong>ThingSpeak · Channel Feeds</strong></div>${badge('Conectado')}<div class="status-detail"><span>Última sincronização</span><strong>09:42:15 · há 15s</strong></div><div class="status-detail"><span>Sensor ativo</span><strong>THS-ESP32-04</strong></div></div>`;
+function metricFor(climate, requested) {
+  return metricEntry(climate, requested)?.[1] || null;
 }
 
-export function monitoringPage({ variety }) {
-  return page(
-    pageHeader({ title: 'Monitoramento Climático', subtitle: 'Dados dos sensores recebidos e processados via ThingSpeak', variety }),
-    integrationStatus(),
-    metricsGrid(
-      [
-        { icon: 'thermo', label: 'Temperatura', value: '28,4 °C', meta: 'Máx. 30,2 °C', tone: 'orange' },
-        { icon: 'drop', label: 'Umidade', value: '67%', meta: 'Mín. 61%', tone: 'blue' },
-        { icon: 'activity', label: 'Leituras hoje', value: '1.284', meta: '99,7% válidas' },
-        { icon: 'wifi', label: 'Conexão', value: 'Estável', meta: 'Latência 1,8s', tone: 'purple' },
-      ],
-      'four',
-    ),
-    html`<div class="grid-2">${chartCard({ title: 'Temperatura por hora', subtitle: 'Hoje · °C', content: lineChart() })}${chartCard({ title: 'Umidade por hora', subtitle: 'Hoje · %', content: lineChart({ data: HUMIDITY_SERIES, color: 'blue' }) })}</div>`,
-    readingsTable(),
-  );
-}
-
-const FORECAST_TIMELINE = [
-  { state: 'done', when: 'Hoje', what: 'Monitoramento' },
-  { state: 'active', when: '18–20 Set', what: 'Colheita ideal' },
-  { state: '', when: '20 Set', what: 'Pré-resfriamento' },
-  { state: '', when: '21–22 Set', what: 'Embarque' },
-  { state: '', when: '02 Out', what: 'Destino' },
-];
-
-const FORECAST_REASONS = ['Temperatura dentro da faixa', 'Umidade com tendência estável', 'Demanda internacional em alta'];
-
-function forecastInsight() {
-  return card(
-    html`<div class="insight-mark">${icon('model')}</div><span class="overline">Explicação da previsão</span><h3>Por que essa janela?</h3><p>Com base nos dados climáticos históricos, condições atuais e indicadores de mercado, o modelo identificou uma janela favorável para esta variedade.</p><ul>${FORECAST_REASONS.map((reason) => html`<li>${icon('check', 16)} ${reason}</li>`)}</ul>${button('Ver dados utilizados')}`,
-    'insight-card',
-  );
-}
-
-export function forecastsPage({ variety }) {
-  const observedVsForecast = chartCard({
-    title: 'Previsão x Dados Observados',
-    subtitle: 'Temperatura projetada com intervalo de confiança',
-    content: html`${chartLegend([
-      { tone: 'green', label: 'Observado' },
-      { tone: 'blue', label: 'Previsão' },
-      { tone: 'soft', label: 'Intervalo de confiança' },
-    ])}${lineChart({ data: TEMPERATURE_SERIES, secondary: [23, 24, 23, 24, 25, 26, 27, 28, 29, 29, 28, 27, 27] })}`,
+function seriesFor(climate, requested) {
+  const entry = metricEntry(climate, requested);
+  if (!entry) return null;
+  const [key] = entry;
+  const points = Array.isArray(climate?.series) ? climate.series : [];
+  const values = [];
+  const labels = [];
+  points.forEach((point) => {
+    const raw = point.values?.[key];
+    if (raw === null || raw === undefined || !Number.isFinite(Number(raw))) return;
+    values.push(Number(raw));
+    const date = new Date(point.timestamp);
+    labels.push(Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(date));
   });
-  const timeline = card(
-    html`${sectionHead({ title: 'Linha do tempo recomendada', subtitle: `Plano preditivo para ${variety}` })}<div class="timeline">${FORECAST_TIMELINE.map(
-      ({ state, when, what }) => html`<div${state ? html` class="${state}"` : ''}><i></i><strong>${when}</strong><span>${what}</span></div>`,
-    )}</div>`,
-    'timeline-card',
-  );
-  return page(
-    pageHeader({ title: 'Previsões', subtitle: 'Modelos preditivos climáticos, agronômicos e logísticos', variety }),
-    metricsGrid(
-      [
-        { icon: 'quality', label: 'Confiança do modelo', value: '87%', meta: '+2,4% nesta versão' },
-        { icon: 'clock', label: 'Janela prevista', value: '18–20 Set', meta: '3 dias favoráveis', tone: 'purple' },
-        { icon: 'warning', label: 'Risco projetado', value: 'Baixo', meta: 'Próximas 72 horas' },
-        { icon: 'trend', label: 'Tendência', value: 'Estável', meta: 'Clima e mercado', tone: 'blue' },
-      ],
-      'four',
-    ),
-    html`<div class="grid-main">${observedVsForecast}${forecastInsight()}</div>`,
-    timeline,
+  return { values, labels };
+}
+
+function emptySeries() {
+  return { values: [], labels: [] };
+}
+
+function syncStrip(climate) {
+  const available = Boolean(climate?.available);
+  const label = available ? `${climate.records} leituras persistidas` : 'Leituras indisponíveis';
+  const detail = available ? `Fonte: ${climate.source}${climate.channelId ? ` · canal ${climate.channelId}` : ''}.` : (climate?.message || 'Configure ThingSpeak para receber dados reais.');
+  return html`<div class="sync-strip"><div>${icon(available ? 'wifi' : 'cloud', 17)}<strong>${label}</strong><span>${detail}</span></div>${badge(available ? 'Dados da API' : 'Sem fonte', available ? 'success' : 'warning')}</div>`;
+}
+
+function noModelCard(title, message, actionLabel, pageName) {
+  return card(
+    html`<div class="recommend-icon">${icon('model')}</div><div class="recommend-main"><span class="overline">Serviço não configurado</span><h3>${title}</h3><p>${message}</p></div>${button(actionLabel, { variant: 'soft', action: 'navigate', page: pageName })}`,
+    'recommend',
   );
 }
 
-export function marketPage({ variety }) {
+export function overviewPage({ variety, dashboard }) {
+  const climate = dashboard?.climate;
+  const plantations = dashboard?.plantations || {};
+  const temperature = metricFor(climate, 'temperature');
+  const humidity = metricFor(climate, 'humidity');
+  const tempSeries = seriesFor(climate, 'temperature') || emptySeries();
+  const humiditySeries = seriesFor(climate, 'humidity') || emptySeries();
+  const comparison = { climateMetrics: climate?.metrics || {}, plantationsByVariety: plantations.byVariety || [] };
   return page(
-    pageHeader({ title: 'Mercado e Exportação', subtitle: 'Inteligência comercial para maximizar valor e oportunidade', variety }),
-    metricsGrid(
-      [
-        { icon: 'market', label: 'Preço atual', value: 'R$ 8,42/kg', meta: '+6,8% vs. mês anterior' },
-        { icon: 'trend', label: 'Preço médio', value: 'R$ 7,89/kg', meta: 'Média de 30 dias', tone: 'blue' },
-        { icon: 'activity', label: 'Demanda', value: 'Alta', meta: 'Mercado europeu', tone: 'purple' },
-        { icon: 'truck', label: 'Volume estimado', value: '428 t', meta: '+12% neste ciclo', tone: 'orange' },
-      ],
-      'four',
-    ),
-    html`<div class="grid-2">${chartCard({ title: 'Evolução de preços', subtitle: 'R$/kg · últimos 30 dias', legend: '+6,8%', content: lineChart({ data: [68, 70, 69, 72, 74, 73, 77, 79, 78, 81, 83, 82, 86] }) })}${chartCard({ title: 'Demanda por mercado', subtitle: 'Participação estimada nos embarques', content: barChart([88, 73, 61, 48, 37, 30, 24]) })}</div>`,
-    comparisonTable(),
+    pageHeader({ title: 'Visão Geral', subtitle: 'Acompanhe as leituras disponíveis e os registros da sua produção.', variety }),
+    syncStrip(climate),
+    metricsGrid([
+      { icon: 'thermo', label: 'Temperatura', value: formatMetric(temperature), meta: temperature ? `${formatMetric(temperature, 'minimum')} mín. · ${formatMetric(temperature, 'maximum')} máx.` : 'Aguardando sensor', tone: 'orange' },
+      { icon: 'drop', label: 'Umidade do ar', value: formatMetric(humidity), meta: humidity ? `${humidity.samples} amostras` : 'Aguardando sensor', tone: 'blue' },
+      { icon: 'leaf', label: 'Plantações em cultivo', value: plantations.growing ?? 0, meta: 'Dados da API Java' },
+      { icon: 'truck', label: 'Previsão de colheita', value: 'Não configurada', meta: 'Nenhum modelo de produção ativo', tone: 'purple' },
+      { icon: 'warning', label: 'Leituras climáticas', value: climate?.records ?? 0, meta: climate?.available ? 'Registros reais recebidos' : 'Sem leituras no período', tone: climate?.available ? 'green' : 'orange' },
+    ]),
+    html`<div class="grid-2">${chartCard({ title: 'Temperatura nas últimas 24 horas', subtitle: 'Leituras recebidas pela API · °C', legend: temperature ? formatMetric(temperature) : 'Sem leitura', content: lineChart({ data: tempSeries.values, labels: tempSeries.labels }) })}${chartCard({ title: 'Umidade do ar', subtitle: 'Leituras recebidas pela API · %', legend: humidity ? formatMetric(humidity) : 'Sem leitura', content: lineChart({ data: humiditySeries.values, labels: humiditySeries.labels, color: 'blue' }) })}</div>`,
+    html`<div class="recommend-grid">${noModelCard('Indicação de colheita indisponível', 'Ainda não há um modelo preditivo configurado. Nenhuma data ou probabilidade foi inventada.', 'Ver previsões', 'Previsões')}${noModelCard('Informações de mercado indisponíveis', 'A API não está ligada a uma fonte de preços ou demanda. Consulte novamente quando uma fonte for configurada.', 'Ver mercado', 'Mercado e Exportação')}</div>`,
+    comparisonTable({ plantations: [], varieties: VARIETIES, comparison }),
+  );
+}
+
+function integrationStatus(climate) {
+  const available = Boolean(climate?.available);
+  return html`<div class="integration-status"><div class="thing-logo">${icon('cloud')}</div><div><span>Origem das informações</span><strong>${climate?.source || 'ThingSpeak'}</strong></div>${badge(available ? 'Disponível' : 'Não configurado', available ? 'success' : 'warning')}<div class="status-detail"><span>Registros no período</span><strong>${climate?.records ?? 0}</strong></div><div class="status-detail"><span>Canal</span><strong>${climate?.channelId || 'Não informado'}</strong></div></div>`;
+}
+
+export function monitoringPage({ variety, climate }) {
+  const temperature = metricFor(climate, 'temperature');
+  const humidity = metricFor(climate, 'humidity');
+  const rain = metricFor(climate, 'rainfall');
+  const tempSeries = seriesFor(climate, 'temperature') || emptySeries();
+  const humiditySeries = seriesFor(climate, 'humidity') || emptySeries();
+  return page(
+    pageHeader({ title: 'Monitoramento Climático', subtitle: 'Leituras persistidas pelo serviço climático para sua conta.', variety }),
+    integrationStatus(climate),
+    metricsGrid([
+      { icon: 'thermo', label: 'Temperatura atual', value: formatMetric(temperature), meta: temperature ? `Máx. ${formatMetric(temperature, 'maximum')}` : 'Sem leitura', tone: 'orange' },
+      { icon: 'drop', label: 'Umidade atual', value: formatMetric(humidity), meta: humidity ? `Mín. ${formatMetric(humidity, 'minimum')}` : 'Sem leitura', tone: 'blue' },
+      { icon: 'activity', label: 'Amostras', value: climate?.records ?? 0, meta: 'No período retornado pela API' },
+      { icon: 'cloud', label: 'Precipitação', value: formatMetric(rain), meta: rain ? `Máx. ${formatMetric(rain, 'maximum')}` : 'Métrica não mapeada', tone: 'purple' },
+    ], 'four'),
+    html`<div class="grid-2">${chartCard({ title: 'Temperatura por captura', subtitle: 'Dados ThingSpeak persistidos · °C', content: lineChart({ data: tempSeries.values, labels: tempSeries.labels }) })}${chartCard({ title: 'Umidade por captura', subtitle: 'Dados ThingSpeak persistidos · %', content: lineChart({ data: humiditySeries.values, labels: humiditySeries.labels, color: 'blue' }) })}</div>`,
+    readingsTable(climate),
+  );
+}
+
+function unavailableAnalysis(title, message) {
+  return card(html`<div class="empty-state"><span>${icon('model')}</span><strong>${title}</strong><small>${message}</small></div>`, 'table-card');
+}
+
+export function forecastsPage({ variety, forecast, climate }) {
+  const available = Boolean(forecast?.available && forecast?.predictions?.length);
+  const temperature = metricFor(climate, 'temperature');
+  const tempSeries = seriesFor(climate, 'temperature') || emptySeries();
+  return page(
+    pageHeader({ title: 'Previsões', subtitle: `Dados de previsão para ${variety}; somente resultados de modelos ativos são exibidos.`, variety }),
+    metricsGrid([
+      { icon: 'quality', label: 'Modelo', value: available ? (forecast.model || 'Ativo') : 'Não configurado', meta: forecast?.message || 'Sem predições', tone: 'blue' },
+      { icon: 'clock', label: 'Horizonte', value: available ? `${forecast.predictions.length} pontos` : '—', meta: 'Sem estimativas inventadas', tone: 'purple' },
+      { icon: 'thermo', label: 'Temperatura atual', value: formatMetric(temperature), meta: 'Leitura observada, não previsão', tone: 'orange' },
+      { icon: 'trend', label: 'Previsões disponíveis', value: available ? 'Sim' : 'Não', meta: available ? 'Fonte de modelo configurada' : 'Nenhum modelo ativo', tone: available ? 'green' : 'orange' },
+    ], 'four'),
+    html`<div class="grid-main">${chartCard({ title: 'Leituras observadas', subtitle: 'Série climática real; não representa previsão', content: lineChart({ data: tempSeries.values, labels: tempSeries.labels }) })}${available ? card(html`<div class="insight-mark">${icon('model')}</div><span class="overline">Modelo conectado</span><h3>${forecast.model}</h3><ul>${forecast.predictions.map((item) => html`<li>${item.date || item.timestamp || ''} · ${item.value}</li>`)}</ul>`, 'insight-card') : unavailableAnalysis('Previsões indisponíveis', forecast?.message || 'Configure um modelo antes de solicitar previsões.')}</div>`,
+  );
+}
+
+export function marketPage({ variety, market, dashboard }) {
+  const available = Boolean(market?.available && market?.series?.length);
+  const rows = available ? market.series.map((item) => html`<tr><td>${item.date || item.timestamp || '—'}</td><td>${item.price ?? '—'}</td><td>${item.market || '—'}</td><td>${item.currency || '—'}</td></tr>`) : [];
+  return page(
+    pageHeader({ title: 'Mercado e Exportação', subtitle: `Informações de mercado para ${variety} somente serão exibidas após configurar uma fonte real.`, variety }),
+    metricsGrid([
+      { icon: 'market', label: 'Fonte de preço', value: available ? (market.source || 'Conectada') : 'Não configurada', meta: 'Integração externa necessária' },
+      { icon: 'trend', label: 'Série de preços', value: available ? market.series.length : '—', meta: 'Nenhum valor demonstrativo exibido', tone: 'blue' },
+      { icon: 'activity', label: 'Plantações registradas', value: dashboard?.plantations?.totalPlantations ?? 0, meta: 'API Java', tone: 'purple' },
+      { icon: 'truck', label: 'Demanda', value: 'Sem dados', meta: 'Sem fonte de mercado', tone: 'orange' },
+    ], 'four'),
+    available ? card(html`${sectionHead({ title: 'Dados de mercado', subtitle: `Fonte: ${market.source || 'API configurada'}` })}${tableWrapper(['Data', 'Preço', 'Mercado', 'Moeda'], rows)}`, 'table-card') : unavailableAnalysis('Dados de mercado indisponíveis', market?.message || 'Nenhuma fonte de preços ou demanda está configurada.'),
   );
 }

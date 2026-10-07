@@ -1,72 +1,76 @@
 # AgroClima Cloud
 
-Dashboard de clima e mercado para a fruticultura do Vale do São Francisco (Projeto Integrador ADS).
-Refatorado de React + Vite + TypeScript para **HTML, CSS e JavaScript puros (módulos ES)**, sem frameworks,
-sem bibliotecas e sem etapa de build. Visual e comportamento são os mesmos da versão original.
+Painel demonstrativo para clima e mercado da fruticultura no Vale do São Francisco (Projeto Integrador ADS). O projeto é uma SPA em **HTML, CSS e JavaScript nativos**, sem framework, bibliotecas de aplicação ou etapa de build. Os ajustes preservam a identidade visual existente e reutilizam os componentes do projeto.
 
 ## Como executar
 
-Módulos ES não funcionam via `file://`; sirva a pasta com qualquer servidor estático:
+Os módulos ES precisam ser servidos por HTTP, não por `file://`:
 
 ```bash
-python3 -m http.server 8080      # ou: npx serve .
+python3 -m http.server 8080 --bind 0.0.0.0
 # abra http://localhost:8080
 ```
 
-Acessos de demonstração (também há botões na tela de login): `produtor@…`, `analista@…` e `admin@…`.
-O perfil é deduzido do e-mail (contém "admin" → Administrador; "analista" → Analista; senão Produtor).
+Na tela de login, escolha um acesso de demonstração e preencha qualquer senha não vazia. A senha **não é validada**: o login apenas demonstra a navegação por perfil. Os perfis padrão são Produtor, Analista e Administrador.
+
+## Funcionalidades da demonstração
+
+- **Produtor:** painel com linguagem simplificada, cadastro e acompanhamento de plantações, registro da colheita e histórico/relatório das áreas.
+- **Plantio:** a data inicial é gerada pelo sistema ao cadastrar. A colheita começa sem data; ao confirmar a colheita, o sistema grava a data e altera o status para `Colhida`, mantendo o registro.
+- **Analista:** Histórico é uma linha do tempo de atividades; Relatórios é uma tela analítica separada, com indicadores, gráficos e exportação CSV.
+- **Administrador:** edição de papéis e permissões, preferências de segurança, auditoria pesquisável/filtrável/ordenável, configurações funcionais e catálogo interativo do Design System.
+- **Tema:** o controle claro/escuro fica na barra superior e em Configurações → Aparência. A preferência é salva e aplicada às páginas da SPA.
+- **Persistência:** plantações, RBAC, preferências e eventos de auditoria são armazenados no `localStorage` do navegador atual.
+
+## Limite importante: não há backend
+
+Este checkout não contém API, controllers HTTP, DTOs, ORM ou banco de dados. Também não existe conexão executada com ThingSpeak, sensores, serviços de mercado ou modelos remotos; clima e mercado continuam baseados em séries demonstrativas do código. As regras de autenticação/RBAC e as políticas de segurança são executadas no cliente e **não devem ser tratadas como segurança de produção**. O `localStorage` é local ao navegador e não sincroniza registros entre pessoas ou dispositivos.
+
+A análise detalhada das estruturas presentes e ausentes está em [`docs/arquitetura-real.md`](docs/arquitetura-real.md). Os diagramas PNG refletem essa implementação real, não uma arquitetura futura inventada:
+
+1. [`docs/diagrama-seguranca-armazenamento.png`](docs/diagrama-seguranca-armazenamento.png) — 3720 × 2610 px.
+2. [`docs/diagrama-analise-dados-dashboard.png`](docs/diagrama-analise-dados-dashboard.png) — 3720 × 2610 px.
+
+Os SVGs-fonte editáveis e o script `docs/render_diagrams.py` (que recria esses SVGs) estão ao lado dos PNGs.
 
 ## Estrutura
 
 ```text
-index.html            Documento base: fontes, folhas de estilo (na ordem da cascata) e <script type="module">
+index.html
 css/
-  reset.css           Reset (equivalente ao preflight que o projeto original recebia do Tailwind), em @layer
-  variables.css       Design tokens (cores e sombra)
-  base.css            box-sizing, body e tipografia dos títulos
-  layout.css          Shell da aplicação, sidebar, logo e topbar
-  components.css      Cabeçalho de página, campos, cards, métricas, gráficos, badges, botões, tabelas
-  pages.css           Blocos específicos de páginas (integrações, modelos, admin, alertas, configurações…)
-  auth.css            Login, cadastro e recuperação de senha
-  responsive.css      Breakpoints 1200 / 900 / 640 / 390px
-  utilities.css       Utilitários (ver "Decisões de fidelidade")
+  reset.css, variables.css, base.css, layout.css, components.css
+  pages.css, auth.css, responsive.css, utilities.css, themes.css
 js/
-  main.js             Ponto de entrada: assina o estado e decide o que renderizar
-  config/             roles.js (perfis, menus, contas) e routes.js (página → função de renderização)
-  data/               Dados demonstrativos (variedades e séries dos gráficos)
-  state/store.js      Estado global mínimo com notificação das chaves alteradas
-  modules/auth.js     Regra de negócio: perfil a partir do e-mail
-  events/index.js     Eventos por delegação (data-action / data-form)
-  components/         icons, ui (botão, badge, card, métrica…), charts (SVG/CSS), tables, page-header
-  views/              auth-view, shell-view e pages/ (producer, analyst, admin, shared)
-  utils/              html.js (template tag com escape automático) e dom.js (montagem no DOM)
+  main.js                       Inicialização, tema e atualização das views
+  config/                       Papéis, navegação e rotas
+  data/                         Séries de demonstração e repositório local JSON
+  events/index.js               Eventos por delegação (data-action / data-form)
+  modules/
+    auth.js                     Resolução demonstrativa do perfil por e-mail
+    access-control.js           Papéis/permissões do lado do cliente
+    plantations.js              Cadastro e colheita com datas automáticas
+    settings.js                 Preferências gerais/tema/segurança
+    audit.js                    Registro de eventos locais
+  state/store.js                Estado de interface e assinantes
+  components/                   Ícones, controles, gráficos SVG e tabelas
+  views/pages/                  Páginas do Produtor, Analista e Administrador
 ```
 
-## Como funciona
+## Fluxo da aplicação
 
 ```text
-evento do usuário → events/index.js → setState (store) → main.js (assinante) → views/* → DOM
+ação do usuário → events/index.js → modules/* → data/local-repository.js → localStorage
+                                                   ↓
+                          state/store.js → main.js → views/* → DOM
 ```
 
-* **HTML** gerado por funções com a template tag `html`, que escapa todo valor interpolado (proteção contra XSS).
-  `innerHTML` é usado apenas em `utils/dom.js`, sempre com marcação produzida por `html`.
-* **Eventos** são registrados uma única vez no contêiner `#root`; os elementos usam `data-action`/`data-form`
-  (não há `onclick` no HTML).
-* **Renderização parcial**: trocar de página substitui apenas a área `.page`; abrir/fechar o menu só alterna classes
-  (mantendo a transição CSS da sidebar); trocar a variedade preserva foco e rolagem.
+- As views são montadas com a template tag `html`, que escapa os valores interpolados. O `innerHTML` fica restrito a `utils/dom.js`.
+- Os eventos são registrados uma vez em `#root`; as views usam atributos `data-action` e `data-form`.
+- A troca de página atualiza o conteúdo interno sem recriar a barra superior e o menu.
+- Chaves locais atuais: `agroclima:plantations`, `agroclima:rbac`, `agroclima:settings` e `agroclima:audit-events`.
 
-### Adicionar uma página
+## Decisões de fidelidade
 
-1. Crie a função em `js/views/pages/…` retornando `page(…)` (use os componentes de `js/components`).
-2. Registre o rótulo em `js/config/routes.js` e, se for item de menu, em `NAVIGATION` (`js/config/roles.js`).
-
-## Decisões de fidelidade (nada de redesign)
-
-* Os valores de CSS são os originais: o `index.css` foi dividido por script em arquivos contíguos e a concatenação
-  em ordem reproduz exatamente as mesmas regras (a cascata não muda).
-* `reset.css` substitui `@import 'tailwindcss'`: o original usava só o reset do Tailwind (as classes são todas
-  customizadas). Ele foi escrito em CSS puro, em `@layer`, para manter o mesmo peso na cascata.
-* `utilities.css`: a classe `.overline` coincidia com um utilitário do Tailwind que desenhava uma linha acima dos
-  rótulos em caixa-alta. O efeito foi preservado; para removê-lo, apague essa regra.
-* Seletores que no original eram controlados e não alteravam nada (ex.: "Período") continuam travados.
-* O `index.html` original não foi enviado: título, `lang` e `viewport` foram definidos como padrão do Vite.
+- Os tokens de cor, tipografia, espaçamentos e componentes existentes foram mantidos; o tema escuro usa os mesmos elementos e tokens sem redesenhar as páginas.
+- Os gráficos continuam em SVG/CSS, sem dependência de biblioteca gráfica.
+- A tela deixa explícitos os valores demonstrativos e as integrações não conectadas, em vez de indicar sensores ou serviços como se estivessem ativos.
