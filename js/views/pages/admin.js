@@ -19,7 +19,7 @@ function serviceCards(dashboard, integrationStatus, pythonHealth) {
   const java = dashboard?.sources?.find((item) => item.source === 'API Java');
   const services = [
     { name: 'API Java', status: java?.available ? 'Disponível' : 'Indisponível', detail: 'JWT · RBAC · JPA', icon: 'server', tone: java?.available ? 'success' : 'warning' },
-    { name: 'Persistência', status: java?.available ? 'Acessível' : 'Verificar', detail: 'PostgreSQL · Flyway', icon: 'database', tone: java?.available ? 'success' : 'warning' },
+    { name: 'Persistência', status: java?.available ? 'Acessível' : 'Verificar', detail: 'MySQL · Flyway', icon: 'database', tone: java?.available ? 'success' : 'warning' },
     { name: 'API Python', status: pythonHealth?.status || 'Não consultada', detail: 'FastAPI · métricas', icon: 'activity', tone: pythonHealth?.status === 'UP' ? 'success' : 'warning' },
     { name: 'ThingSpeak', status: integrationStatus?.configured ? 'Configurado' : 'Não configurado', detail: integrationStatus?.channelId ? `Canal ${integrationStatus.channelId}` : 'Sem canal definido', icon: 'cloud', tone: integrationStatus?.configured ? 'success' : 'neutral' },
   ];
@@ -62,7 +62,7 @@ export function adminDashboardPage({ auditLogs = [], rbac = DEFAULT_RBAC, dashbo
     hiddenVarietyHeader('Dashboard Administrativo', 'Resumo de contas, integrações e auditoria retornados pelos serviços.'),
     metricsGrid([
       { icon: 'users', label: 'Usuários ativos', value: activeUsers, meta: `${users.length} contas na API` },
-      { icon: 'lock', label: 'Usuários bloqueados', value: blockedUsers, meta: 'Status persistido no PostgreSQL', tone: 'orange' },
+      { icon: 'lock', label: 'Usuários bloqueados', value: blockedUsers, meta: 'Status persistido no MySQL', tone: 'orange' },
       { icon: 'activity', label: 'Acessos hoje', value: sessionsToday, meta: 'Eventos de sessão auditados', tone: 'blue' },
       { icon: 'shield', label: 'Eventos com falha', value: failedEvents, meta: 'Auditoria central', tone: 'purple' },
     ], 'four'),
@@ -101,7 +101,7 @@ export function usersPage({ rbac = DEFAULT_RBAC } = {}) {
 const ARCHITECTURE_STEPS = [
   { name: 'Frontend', detail: 'SPA existente', icon: 'grid' },
   { name: 'API Java', detail: 'JWT · RBAC · REST', icon: 'lock' },
-  { name: 'PostgreSQL', detail: 'JPA · Flyway', icon: 'database' },
+  { name: 'MySQL Server', detail: 'JPA · Flyway', icon: 'database' },
   { name: 'API Python', detail: 'FastAPI · Pandas', icon: 'activity' },
   { name: 'ThingSpeak', detail: 'Canal configurável', icon: 'cloud' },
 ];
@@ -109,7 +109,7 @@ const ARCHITECTURE_STEPS = [
 function architectureFlow() {
   const steps = ARCHITECTURE_STEPS.map((step, index) => html`<div class="arch-group"><div class="arch-step"><div>${icon(step.icon)}</div><strong>${step.name}</strong><span>${step.detail}</span></div>${index < ARCHITECTURE_STEPS.length - 1 && html`<span class="flow-arrow">→</span>`}</div>`);
   return card(
-    html`${sectionHead({ title: 'Arquitetura integrada', subtitle: 'O frontend chama APIs same-origin; o serviço Python consulta o Java e não acessa o PostgreSQL.' })}<div class="architecture-flow">${steps}</div><div class="architecture-note">${icon('shield')}<span><strong>Escopo protegido:</strong> JWT e permissões são verificados pela API Java; ThingSpeak usa configuração de ambiente e segredo servidor-servidor.</span></div>`,
+    html`${sectionHead({ title: 'Arquitetura integrada', subtitle: 'O frontend chama APIs same-origin; o serviço Python consulta o Java e não acessa o MySQL Server.' })}<div class="architecture-flow">${steps}</div><div class="architecture-note">${icon('shield')}<span><strong>Escopo protegido:</strong> JWT e permissões são verificados pela API Java; ThingSpeak usa configuração de ambiente e segredo servidor-servidor.</span></div>`,
     'architecture',
   );
 }
@@ -118,7 +118,7 @@ export function integrationsPage({ integrationStatus, pythonHealth, dashboard } 
   const javaAvailable = dashboard?.sources?.find((item) => item.source === 'API Java')?.available;
   const data = [
     { name: 'API Java', description: 'Autenticação JWT, autorização RBAC e API REST.', status: javaAvailable ? 'Disponível' : 'Não verificada', updated: 'Serviço de domínio', icon: 'server', tone: javaAvailable ? 'success' : 'warning' },
-    { name: 'Persistência', description: 'PostgreSQL com JPA/Hibernate e migrations Flyway.', status: javaAvailable ? 'Acessível' : 'Não verificada', updated: 'Através da API Java', icon: 'database', tone: javaAvailable ? 'success' : 'warning' },
+    { name: 'Persistência', description: 'MySQL com JPA/Hibernate e migrations Flyway.', status: javaAvailable ? 'Acessível' : 'Não verificada', updated: 'Através da API Java', icon: 'database', tone: javaAvailable ? 'success' : 'warning' },
     { name: 'API Python', description: 'Leituras, métricas, qualidade e dashboards analíticos.', status: pythonHealth?.status || 'Não verificada', updated: 'FastAPI', icon: 'activity', tone: pythonHealth?.status === 'UP' ? 'success' : 'warning' },
     { name: 'ThingSpeak', description: 'Canal e campos definidos por variáveis de ambiente.', status: integrationStatus?.configured ? 'Configurado' : 'Não configurado', updated: integrationStatus?.channelId ? `Canal ${integrationStatus.channelId}` : 'Sem canal definido', icon: 'cloud', tone: integrationStatus?.configured ? 'success' : 'neutral' },
   ];

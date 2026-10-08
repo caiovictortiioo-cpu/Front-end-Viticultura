@@ -1,20 +1,31 @@
 # Backend Java — AgroClima API
 
-API Spring Boot responsável por autenticação JWT, RBAC, usuários, variedades, plantações, configurações, auditoria e persistência PostgreSQL.
+API Spring Boot responsável por autenticação JWT, RBAC, usuários, variedades, plantações, configurações, auditoria e persistência em **MySQL Server**. O ORM continua sendo JPA/Hibernate; MySQL Workbench é opcional e serve como cliente gráfico para administrar o servidor, não como banco ou ORM. O serviço Python consome esta API e não acessa o banco diretamente.
 
 ## Requisitos locais
 
 - JDK 21;
 - Maven 3.9+;
-- PostgreSQL 16+ em `localhost:5432`.
+- MySQL Server 8.4+ em `localhost:3306`;
+- MySQL Workbench opcional.
 
 Docker não é necessário para iniciar ou desenvolver a API.
 
-## Configuração local
+## Criar o banco e configurar localmente
 
-Na raiz do repositório, copie `backend/java/.env.example` para `backend/java/.env` e configure:
+No MySQL Workbench, conecte-se ao servidor local e execute no SQL Editor (como usuário administrativo):
 
-- `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD` para o PostgreSQL local;
+```sql
+CREATE DATABASE agroclima
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'agroclima'@'localhost' IDENTIFIED BY 'DEFINA_UMA_SENHA_LOCAL';
+GRANT ALL PRIVILEGES ON agroclima.* TO 'agroclima'@'localhost';
+```
+
+Depois de copiar `backend/java/.env.example` para `backend/java/.env`, configure:
+
+- `DATABASE_URL=jdbc:mysql://localhost:3306/agroclima`, `DATABASE_USER` e `DATABASE_PASSWORD` para o servidor local;
 - `JWT_SECRET` e `INTERNAL_API_KEY` como segredos aleatórios independentes com pelo menos 32 bytes;
 - `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD` para criar o primeiro Administrador;
 - `CORS_ALLOWED_ORIGINS` com as origens locais permitidas, sem wildcard;
@@ -22,9 +33,9 @@ Na raiz do repositório, copie `backend/java/.env.example` para `backend/java/.e
 
 O Spring Boot não lê `.env` automaticamente. Use `bash backend/java/run-local.sh` em Linux/macOS ou `backend/java/run-local.ps1` no PowerShell; os scripts carregam as variáveis e iniciam `mvn spring-boot:run`. Também é possível exportar as variáveis manualmente.
 
-A senha administrativa deve ter pelo menos 8 caracteres, conter letra e número e obedecer ao limite de tamanho. Não versione o `.env` real.
+A senha administrativa deve ter pelo menos 8 caracteres, conter letra e número e obedecer ao limite de tamanho. Não versione o `.env` real. O Workbench sozinho não substitui o MySQL Server: ambos precisam estar instalados/iniciados para abrir uma conexão.
 
-A migration `src/main/resources/db/migration/V1__create_agroclima_schema.sql` cria o schema, papéis/permissões e as cinco variedades existentes no frontend. O Flyway aplica a migration no startup e Hibernate valida o schema.
+A migration `src/main/resources/db/migration/V1__create_agroclima_schema.sql` cria as tabelas da aplicação, os papéis/permissões e as cinco variedades existentes no frontend. Flyway aplica a migration no startup e Hibernate valida o schema (`ddl-auto=validate`). Após iniciar a API, atualize os schemas no Workbench para conferir as tabelas. O projeto não migra dados já existentes em PostgreSQL; use um schema MySQL limpo e trate uma eventual transferência de dados separadamente.
 
 ## Executar e verificar
 
@@ -56,4 +67,4 @@ cd backend/java
 mvn test
 ```
 
-Testes unitários não precisam de Docker. O teste PostgreSQL/Testcontainers é configurado para ser ignorado se Docker não estiver disponível. Para validar o schema real, inicie o PostgreSQL local e a API.
+Testes unitários não precisam de Docker. `MySqlPersistenceTest` usa Testcontainers com MySQL e é configurado para ser ignorado se Docker não estiver disponível. Sem Docker, valide o schema e a persistência executando a API contra o MySQL Server local configurado acima.

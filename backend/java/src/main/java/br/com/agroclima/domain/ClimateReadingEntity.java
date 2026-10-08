@@ -36,7 +36,7 @@ public class ClimateReadingEntity {
     private Instant capturedAt;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "measurements", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "measurements", nullable = false, columnDefinition = "json")
     private Map<String, BigDecimal> measurements = new LinkedHashMap<>();
 
     @Column(name = "quality_status", nullable = false, length = 24)

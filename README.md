@@ -1,6 +1,6 @@
 # AgroClima Cloud — desenvolvimento local
 
-Aplicação web com frontend JavaScript, API de domínio Spring Boot, serviço analítico FastAPI e PostgreSQL. O ambiente de desenvolvimento usa **somente serviços locais**: não precisa de domínio, hospedagem, Railway, Render, AWS, Azure, Vercel ou Docker. ThingSpeak é a única integração externa opcional em tempo de execução.
+Aplicação web com frontend JavaScript, API de domínio Spring Boot, serviço analítico FastAPI e MySQL Server local (administrável pelo MySQL Workbench). O ambiente de desenvolvimento usa **somente serviços locais**: não precisa de domínio, hospedagem, Railway, Render, AWS, Azure, Vercel ou Docker. ThingSpeak é a única integração externa opcional em tempo de execução.
 
 O navegador chama caminhos same-origin (`/api/java` e `/api/python`); o proxy do Vite encaminha as chamadas para as APIs locais. As fontes DM Sans e Manrope são empacotadas no frontend, e os arquivos Swagger UI do Python são servidos pela própria API; a documentação não depende de CDN.
 
@@ -9,7 +9,7 @@ O navegador chama caminhos same-origin (`/api/java` e `/api/python`); o proxy do
 Instale no computador:
 
 - **JDK 21** e **Maven 3.9+** para a API Java;
-- **PostgreSQL 16+** instalado e em execução local;
+- **MySQL Server 8.4+** instalado e em execução local; o MySQL Workbench é opcional para administrar o servidor;
 - **Python 3.11+** para a API analítica;
 - **Node.js 22+** e npm para o frontend.
 
@@ -20,20 +20,25 @@ Não é necessário instalar ou iniciar Docker. As portas padrão devem estar li
 | Frontend Vite | 5173 | <http://localhost:5173> |
 | API Java / Spring Boot | 8080 | <http://localhost:8080> |
 | API Python / FastAPI | 8000 | <http://localhost:8000> |
-| PostgreSQL | 5432 | `localhost:5432` |
+| MySQL Server | 3306 | `localhost:3306` |
 
-## 2. Criar e configurar o PostgreSQL local
+## 2. Criar e configurar o MySQL Server local
 
-Inicie o serviço PostgreSQL instalado no computador. Crie uma role e o banco usados pela aplicação (ou atualize `DATABASE_USER`, `DATABASE_PASSWORD` e `DATABASE_URL` para corresponderem a um banco já existente):
+Instale e inicie o **MySQL Server 8.4** no computador. O MySQL Workbench é um cliente gráfico para administrar o servidor; instalá-lo sozinho não instala nem inicia o banco. Conecte pelo Workbench a `127.0.0.1:3306` com uma conta administrativa e execute uma vez no SQL Editor:
 
 ```sql
-CREATE ROLE agroclima LOGIN PASSWORD 'SUBSTITUA_PELA_SENHA_LOCAL';
-CREATE DATABASE agroclima OWNER agroclima;
+CREATE DATABASE agroclima
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'agroclima'@'localhost' IDENTIFIED BY 'SUBSTITUA_POR_UMA_SENHA_LOCAL';
+GRANT ALL PRIVILEGES ON agroclima.* TO 'agroclima'@'localhost';
 ```
 
-Por exemplo, abra `psql -U postgres -h localhost` e execute os comandos acima. Também é possível fazer a mesma operação pelo pgAdmin. Use em `DATABASE_PASSWORD` exatamente a senha atribuída à role `agroclima`.
+Use a mesma senha em `DATABASE_PASSWORD` no `.env` Java. Caso já tenha criado outro schema ou usuário, atualize `DATABASE_URL`, `DATABASE_USER` e `DATABASE_PASSWORD` para corresponderem a eles. Para conexão direta local, o endereço padrão é `jdbc:mysql://localhost:3306/agroclima`.
 
-Ao iniciar, Flyway aplica `backend/java/src/main/resources/db/migration/` automaticamente. O Hibernate valida o schema criado pelas migrations.
+Ao iniciar a API Java, Flyway aplica as migrations MySQL em `backend/java/src/main/resources/db/migration/`; o Hibernate valida o schema (não o cria automaticamente). Depois do boot, atualize a lista de schemas no Workbench para conferir as tabelas `app_user`, `plantation`, `climate_reading` e demais objetos da aplicação. Os dados existentes em PostgreSQL não são migrados automaticamente: use um schema MySQL novo e planeje qualquer exportação/importação separadamente.
+
+O `docker-compose.yml` oferece, opcionalmente, um MySQL em container e publica sua porta local para conexão pelo Workbench; Docker não é necessário no fluxo direto acima.
 
 ## 3. Arquivos `.env`
 
@@ -57,7 +62,7 @@ Copy-Item backend/python/.env.example backend/python/.env
 
 Preencha pelo menos:
 
-- `DATABASE_URL`, `DATABASE_USER` e `DATABASE_PASSWORD`: acesso ao PostgreSQL local;
+- `DATABASE_URL`, `DATABASE_USER` e `DATABASE_PASSWORD`: acesso ao MySQL Server local;
 - `JWT_SECRET`: segredo aleatório de pelo menos 32 bytes;
 - `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD`: conta administrativa inicial;
 - `INTERNAL_API_KEY`: chave aleatória com pelo menos 32 caracteres, compartilhada com o Python;
@@ -70,7 +75,7 @@ Gere valores independentes para `JWT_SECRET` e `INTERNAL_API_KEY` e copie-os par
 python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Execute o comando separadamente para cada segredo; use o valor de `DATABASE_PASSWORD` também no `CREATE ROLE` do PostgreSQL. A senha administrativa deve ter ao menos 8 caracteres, conter letras e números e respeitar o limite documentado pelo backend.
+Execute o comando separadamente para cada segredo; use o valor de `DATABASE_PASSWORD` também ao criar o usuário MySQL no Workbench. A senha administrativa deve ter ao menos 8 caracteres, conter letras e números e respeitar o limite documentado pelo backend.
 
 ### Python — `backend/python/.env`
 
@@ -94,7 +99,7 @@ Esses caminhos relativos preservam same-origin no navegador; o Vite faz o proxy 
 
 ## 4. Iniciar a API Java
 
-Com PostgreSQL ligado e `backend/java/.env` preenchido, abra um terminal na raiz do projeto:
+Com MySQL Server ligado, schema/usuário criados e `backend/java/.env` preenchido, abra um terminal na raiz do projeto:
 
 **Linux/macOS (Bash):**
 
@@ -230,7 +235,7 @@ THINGSPEAK_URL=https://api.thingspeak.com
 THINGSPEAK_FIELD_MAP={"temperature":"field1","humidity":"field2","rainfall":"field3","luminosity":"field4","soilHumidity":"field5"}
 ```
 
-Ajuste o mapa conforme os campos reais do canal e reinicie o serviço Python. A sincronização automática roda no intervalo `THINGSPEAK_POLL_INTERVAL_SECONDS`; também é possível solicitar sincronização manual autenticado como Administrador em `POST http://localhost:8000/api/v1/integrations/thingspeak/sync`. A API Python normaliza as leituras e envia os dados à API Java pela rota interna protegida por `INTERNAL_API_KEY`; não acessa o PostgreSQL diretamente.
+Ajuste o mapa conforme os campos reais do canal e reinicie o serviço Python. A sincronização automática roda no intervalo `THINGSPEAK_POLL_INTERVAL_SECONDS`; também é possível solicitar sincronização manual autenticado como Administrador em `POST http://localhost:8000/api/v1/integrations/thingspeak/sync`. A API Python normaliza as leituras e envia os dados à API Java pela rota interna protegida por `INTERNAL_API_KEY`; não acessa o MySQL diretamente.
 
 Verifique `/health` para `thingspeakConfigured` e, autenticado como Administrador, consulte `/api/v1/integrations/thingspeak/status`. Sem canal/chave, o backend local continua iniciando; as rotas que precisam de leituras retornam o estado de indisponibilidade correspondente.
 
@@ -251,12 +256,12 @@ cd ../java
 mvn test
 ```
 
-A suíte de persistência Java usa Testcontainers e é marcada para ser ignorada quando Docker não está disponível; os testes unitários podem ser executados sem Docker. Para validar as migrations e a persistência de verdade, mantenha o PostgreSQL local ativo e faça o boot da API Java.
+A suíte de persistência Java usa Testcontainers com MySQL e é marcada para ser ignorada quando Docker não está disponível; os testes unitários podem ser executados sem Docker. Para validar as migrations e a persistência no fluxo sem Docker, mantenha o MySQL Server local ativo e faça o boot da API Java; o Hibernate valida o schema ao iniciar.
 
 ## 10. Variáveis e dependências externas
 
-- Portas padrão: frontend `5173`, Java `8080`, Python `8000`, PostgreSQL `5432`.
-- Segredos necessários: `JWT_SECRET`, `INITIAL_ADMIN_PASSWORD` e `INTERNAL_API_KEY`; além da senha local do PostgreSQL. Mantenha os `.env` reais fora do Git.
+- Portas padrão: frontend `5173`, Java `8080`, Python `8000`, MySQL Server `3306`.
+- Segredos necessários: `JWT_SECRET`, `INITIAL_ADMIN_PASSWORD` e `INTERNAL_API_KEY`; além da senha do usuário local do MySQL. Mantenha os `.env` reais fora do Git.
 - Python e Java comunicam-se por `localhost`; o navegador usa same-origin pelo proxy Vite, com bases diretas configuráveis por `VITE_API_JAVA_BASE` e `VITE_API_PYTHON_BASE`.
 - ThingSpeak (`https://api.thingspeak.com`) é opcional e externo. Não há dependência de backend hospedado ou domínio.
 - npm, PyPI e Maven podem ser acessados para baixar dependências durante a instalação inicial; não são chamadas de runtime da aplicação.
@@ -264,10 +269,10 @@ A suíte de persistência Java usa Testcontainers e é marcada para ser ignorada
 
 ## 11. Problemas comuns
 
-- **`Connection refused` na porta 5432:** inicie o serviço PostgreSQL local e confirme `DATABASE_URL`, usuário e senha.
+- **`Connection refused` na porta 3306:** inicie o MySQL Server local e confirme `DATABASE_URL`, usuário e senha.
 - **Falha de conexão Python → Java:** confirme que a API Java responde em `http://localhost:8080`, que `JAVA_API_URL` está assim no `.env` Python e que a chave interna é idêntica nos dois serviços.
 - **JWT ou administrador não configurado:** preencha `JWT_SECRET` e `INITIAL_ADMIN_PASSWORD` no `.env` Java antes do primeiro boot; a senha deve cumprir a política do sistema.
 - **`Address already in use`:** libere a porta ou ajuste `PORT`, `VITE_PORT` e os destinos `DEV_*_API_URL`/bases da API correspondentes.
 - **Erro de CORS usando chamada direta:** acrescente a origem exata (incluindo porta) a `CORS_ALLOWED_ORIGINS` nos dois serviços e reinicie-os. Não use `*` em substituição à lista.
 - **ThingSpeak indisponível:** confirme canal, chave de leitura, `THINGSPEAK_FIELD_MAP` e acesso à Internet; isso não impede o boot das APIs.
-- **Tela carrega, mas login falha:** confirme que o PostgreSQL, Java e Python foram iniciados; consulte os logs do backend e teste `/actuator/health` e `/health`.
+- **Tela carrega, mas login falha:** confirme que o MySQL Server, Java e Python foram iniciados; consulte os logs do backend e teste `/actuator/health` e `/health`.

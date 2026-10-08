@@ -29,7 +29,7 @@ public class AppSettingEntity {
     private String key;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "json_value", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "json_value", nullable = false, columnDefinition = "json")
     private JsonNode jsonValue;
 
     @ManyToOne(fetch = FetchType.LAZY)
