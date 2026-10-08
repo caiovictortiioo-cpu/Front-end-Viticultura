@@ -1,45 +1,43 @@
 import { html } from '../utils/html.js';
-import { DEMO_ACCESSES, ROLES } from '../config/roles.js';
 import { icon } from '../components/icons.js';
 import { badge, button, logo } from '../components/ui.js';
 
 const GRAPE_COUNT = 10;
-const AUTH_POINTS = ['Monitoramento via ThingSpeak', 'Previsões de colheita e exportação', 'Análise das cinco variedades'];
+const AUTH_POINTS = [
+  'Plantações e colheitas persistidas no servidor',
+  'Leituras ThingSpeak quando configuradas',
+  'Acesso por perfil validado pela API',
+];
 
 const backToLogin = html`<button type="button" class="back-link" data-action="auth-mode" data-mode="login">← Voltar ao login</button>`;
 
-const textField = ({ label, placeholder, type = 'text' }) =>
-  html`<label class="field"><span>${label}</span><input${type === 'text' ? '' : html` type="${type}"`} required placeholder="${placeholder}"></label>`;
+const textField = ({ label, placeholder, type = 'text', name, required = true, autocomplete = '', minLength, maxLength }) =>
+  html`<label class="field"><span>${label}</span><input name="${name}" type="${type}" placeholder="${placeholder}"${required ? ' required' : ''}${autocomplete ? html` autocomplete="${autocomplete}"` : ''}${minLength ? html` minlength="${minLength}"` : ''}${maxLength ? html` maxlength="${maxLength}"` : ''}></label>`;
 
-function loginForm(email) {
-  const demoButtons = DEMO_ACCESSES.map(
-    (access) => html`<button type="button" data-action="demo-login" data-email="${access.email}"><strong>${access.label}</strong><small>${access.email}</small></button>`,
-  );
-  return html`<div class="auth-heading"><span class="overline">Acesso à plataforma</span><h1>Bem-vindo ao AgroClima Cloud</h1><p>Monitoramento inteligente para produção e exportação de uvas.</p></div><form data-form="login"><label class="field"><span>E-mail</span><input id="login-email" type="email" value="${email}" placeholder="nome@empresa.com" required></label><label class="field"><span>Senha</span><div class="input-icon"><input type="password" placeholder="Digite sua senha" required>${icon('eye')}</div></label><div class="form-meta"><label><input type="checkbox" checked>Lembrar de mim</label><button type="button" data-action="auth-mode" data-mode="forgot">Esqueci minha senha</button></div>${button('Entrar na plataforma', { type: 'submit' })}</form><div class="demo-access"><span>Acessos independentes para demonstração</span>${demoButtons}</div><div class="signup-link">Ainda não tem uma conta? <button type="button" data-action="auth-mode" data-mode="signup">Criar uma conta</button></div>`;
+function loginForm(email, authMessage = '', busy = false) {
+  return html`<div class="auth-heading"><span class="overline">Acesso à plataforma</span><h1>Bem-vindo ao AgroClima Cloud</h1><p>Entre com a conta cadastrada no serviço seguro da plataforma.</p></div>${authMessage && html`<p class="form-feedback auth-feedback" role="alert">${authMessage}</p>`}<form data-form="login"><label class="field"><span>E-mail</span><input id="login-email" name="email" type="email" value="${email}" placeholder="nome@empresa.com" autocomplete="username" required></label><label class="field"><span>Senha</span><div class="input-icon"><input name="password" type="password" placeholder="Digite sua senha" autocomplete="current-password" required maxlength="72">${icon('eye')}</div></label>${button(busy ? 'Entrando…' : 'Entrar na plataforma', { type: 'submit', disabled: busy })}</form><div class="signup-link">Ainda não tem uma conta? <button type="button" data-action="auth-mode" data-mode="signup">Criar uma conta</button></div><p class="auth-security-note">A autenticação e as permissões são verificadas pela API Java. Não use contas demonstrativas.</p>`;
 }
 
-function signupForm() {
-  const roleOptions = Object.values(ROLES).map((role) => html`<option>${role}</option>`);
-  return html`${backToLogin}<div class="auth-heading"><h1>Crie sua conta</h1><p>Preencha seus dados para solicitar acesso.</p></div><form data-form="signup"><div class="form-grid">${textField({ label: 'Nome completo', placeholder: 'Seu nome' })}${textField({ label: 'E-mail', placeholder: 'nome@empresa.com', type: 'email' })}${textField({ label: 'Telefone', placeholder: '(87) 99999-0000' })}${textField({ label: 'Empresa', placeholder: 'Nome da empresa' })}${textField({ label: 'Cargo', placeholder: 'Seu cargo' })}<label class="field"><span>Perfil</span><select>${roleOptions}</select></label>${textField({ label: 'Senha', placeholder: 'Mínimo 8 caracteres', type: 'password' })}${textField({ label: 'Confirmar senha', placeholder: 'Repita a senha', type: 'password' })}</div><label class="terms"><input type="checkbox" required>Li e aceito os Termos de Uso e a Política de Privacidade.</label>${button('Criar conta', { type: 'submit' })}</form>`;
+function signupForm(authMessage = '', busy = false) {
+  return html`${backToLogin}<div class="auth-heading"><h1>Crie sua conta</h1><p>O cadastro público cria uma conta de Produtor. Um administrador poderá alterar o perfil.</p></div>${authMessage && html`<p class="form-feedback auth-feedback" role="alert">${authMessage}</p>`}<form data-form="signup"><div class="form-grid">${textField({ name: 'name', label: 'Nome completo', placeholder: 'Seu nome', autocomplete: 'name', minLength: 2, maxLength: 160 })}${textField({ name: 'email', label: 'E-mail', placeholder: 'nome@empresa.com', type: 'email', autocomplete: 'email', maxLength: 254 })}${textField({ name: 'phone', label: 'Telefone', placeholder: '(87) 99999-0000', required: false, autocomplete: 'tel', maxLength: 30 })}${textField({ name: 'organization', label: 'Empresa', placeholder: 'Nome da empresa', required: false, maxLength: 160 })}${textField({ name: 'jobTitle', label: 'Cargo', placeholder: 'Seu cargo', required: false, maxLength: 120 })}${textField({ name: 'password', label: 'Senha', placeholder: 'Mínimo 8 caracteres', type: 'password', autocomplete: 'new-password', minLength: 8, maxLength: 72 })}${textField({ name: 'confirmPassword', label: 'Confirmar senha', placeholder: 'Repita a senha', type: 'password', autocomplete: 'new-password', minLength: 8, maxLength: 72 })}</div><label class="terms"><input name="terms" type="checkbox" required>Li e aceito os Termos de Uso e a Política de Privacidade.</label>${button(busy ? 'Criando…' : 'Criar conta', { type: 'submit', disabled: busy })}</form>`;
 }
 
-function forgotForm() {
-  return html`${backToLogin}<div class="auth-heading"><div class="recover-icon">${icon('lock')}</div><h1>Esqueci minha senha</h1><p>Informe seu e-mail e enviaremos um link seguro para criar uma nova senha.</p></div><form data-form="forgot">${textField({ label: 'E-mail', placeholder: 'nome@empresa.com', type: 'email' })}${button('Enviar link de recuperação', { type: 'submit' })}</form>`;
+function forgotForm(authMessage = '') {
+  return html`${backToLogin}<div class="auth-heading"><div class="recover-icon">${icon('lock')}</div><h1>Recuperação de senha</h1><p>O envio automático de links ainda não está configurado. Fale com o administrador da plataforma para redefinir sua senha.</p></div>${authMessage && html`<p class="form-feedback" role="status">${authMessage}</p>`}<button type="button" class="btn btn-secondary" data-action="auth-mode" data-mode="login">Voltar ao login</button>`;
 }
 
-/** Conteúdo interno do cartão de autenticação, conforme o modo atual. */
-export function authFormContent({ authMode, email }) {
-  if (authMode === 'signup') return signupForm();
-  if (authMode === 'forgot') return forgotForm();
-  return loginForm(email);
+export function authFormContent({ authMode, email, authMessage, authBusy }) {
+  if (authMode === 'signup') return signupForm(authMessage, authBusy);
+  if (authMode === 'forgot') return forgotForm(authMessage);
+  return loginForm(email, authMessage, authBusy);
 }
 
 function visualPanel() {
   const grapes = Array.from({ length: GRAPE_COUNT }, () => html`<i></i>`);
   const points = AUTH_POINTS.map((point) => html`<span>${icon('check')}${point}</span>`);
-  return html`<div class="auth-visual">${logo({ light: true })}<div class="auth-art"><div class="orbit orbit-a"><span>${icon('cloud')}</span></div><div class="orbit orbit-b"><span>${icon('thermo')}</span></div><div class="grape-cluster">${grapes}</div><div class="sensor-card">${icon('wifi')}<div><span>Sensor THS-04</span><strong>28,4 °C · 67%</strong></div>${badge('Online')}</div></div><div class="auth-message"><span>Inteligência para o Vale do São Francisco</span><h2>Do clima ao mercado.<br>Decisões no tempo certo.</h2><p>Dados de sensores, previsões e mercado em uma única plataforma de inteligência agrícola.</p><div class="auth-points">${points}</div></div></div>`;
+  return html`<div class="auth-visual">${logo({ light: true })}<div class="auth-art"><div class="orbit orbit-a"><span>${icon('cloud')}</span></div><div class="orbit orbit-b"><span>${icon('thermo')}</span></div><div class="grape-cluster">${grapes}</div><div class="sensor-card">${icon('wifi')}<div><span>Integração climática</span><strong>ThingSpeak configurável</strong></div>${badge('API', 'info')}</div></div><div class="auth-message"><span>Inteligência para o Vale do São Francisco</span><h2>Dados confiáveis.<br>Decisões no tempo certo.</h2><p>Plantações, leituras e dashboards integrados aos serviços AgroClima.</p><div class="auth-points">${points}</div></div></div>`;
 }
 
 export function authView(state) {
-  return html`<div class="auth-shell">${visualPanel()}<main class="auth-form-wrap"><div class="mobile-logo">${logo()}</div><div class="auth-form">${authFormContent(state)}</div><p class="auth-footer">© 2026 AgroClima Cloud · Projeto Integrador ADS</p></main></div>`;
+  return html`<div class="auth-shell">${visualPanel()}<main class="auth-form-wrap"><div class="mobile-logo">${logo()}</div><div class="auth-form">${state.booting ? html`<p class="form-feedback" role="status">Restaurando sessão segura…</p>` : authFormContent(state)}</div><p class="auth-footer">© 2026 AgroClima Cloud · Projeto Integrador ADS</p></main></div>`;
 }

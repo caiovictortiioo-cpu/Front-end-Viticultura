@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agroclima}
+      POSTGRES_USER: ${POSTGRES_USER:-agroclima}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+    volumes:
+      - agroclima-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    networks: [agroclima]
+
+  java:
+    build:
+      context: ./backend/java
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      SERVER_ADDRESS: 0.0.0.0
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agroclima}
+      DATABASE_USER: ${POSTGRES_USER:-agroclima}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-60}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@agroclima.com}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?Set INITIAL_ADMIN_PASSWORD in .env}
+      MAX_LOGIN_FAILURES: ${MAX_LOGIN_FAILURES:-5}
+      LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES:-15}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:8081}
+    ports:
+      - "${JAVA_PORT:-8080}:8080"
+    networks: [agroclima]
+
+  python:
+    build:
+      context: ./backend/python
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - java
+    environment:
+      JAVA_API_URL: http://java:8080
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in .env}
+      THINGSPEAK_CHANNEL_ID: ${THINGSPEAK_CHANNEL_ID:-}
+      THINGSPEAK_READ_API_KEY: ${THINGSPEAK_READ_API_KEY:-}
+      THINGSPEAK_URL: ${THINGSPEAK_URL:-https://api.thingspeak.com}
+      THINGSPEAK_FIELD_MAP: ${THINGSPEAK_FIELD_MAP:?Set THINGSPEAK_FIELD_MAP to the JSON field mapping in .env}
+      THINGSPEAK_POLL_INTERVAL_SECONDS: ${THINGSPEAK_POLL_INTERVAL_SECONDS:-300}
+      THINGSPEAK_RESULTS_LIMIT: ${THINGSPEAK_RESULTS_LIMIT:-500}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:8081}
+      ROOT_PATH: /api/python
+    ports:
+      - "${PYTHON_PORT:-8000}:8000"
+    networks: [agroclima]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - java
+      - python
+    ports:
+      - "${FRONTEND_PORT:-8081}:80"
+    networks: [agroclima]
+
+volumes:
+  agroclima-postgres:
+
+networks:
+  agroclima:
+    driver: bridge
